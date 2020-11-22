@@ -1,7 +1,7 @@
 # Standalone SRP-6a implementation in go-lang
 
-[![GoDoc](https://godoc.org/github.com/opencoff/go-srp?status.svg)](https://godoc.org/github.com/opencoff/go-srp)
-[![Go Report Card](https://goreportcard.com/badge/github.com/opencoff/go-srp)](https://goreportcard.com/report/github.com/opencoff/go-srp)
+[![GoDoc](https://godoc.org/github.com/ooozws/go-srp?status.svg)](https://godoc.org/github.com/ooozws/go-srp)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ooozws/go-srp)](https://goreportcard.com/report/github.com/ooozws/go-srp)
 
 This is a standalone implementation of SRP in golang. It uses the go
 standard libraries and has no other external dependencies. This library
@@ -263,7 +263,7 @@ There is an example program that shows you the API usage (documented
 above).:
 
 ```sh
-    $ git clone https://github.com/opencoff/go-srp
+    $ git clone https://github.com/ooozws/go-srp
     $ cd go-srp
     $ go test -v
 ```

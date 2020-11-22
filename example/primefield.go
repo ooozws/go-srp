@@ -10,9 +10,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/opencoff/go-srp"
 	"os"
 	"strconv"
+
+	"github.com/ooozws/go-srp"
 )
 
 func main() {

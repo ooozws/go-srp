@@ -1,4 +1,4 @@
-module github.com/opencoff/go-srp
+module github.com/ooozws/go-srp
 
 go 1.13
 
