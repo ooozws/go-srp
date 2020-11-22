@@ -410,8 +410,18 @@ func (c *Client) Generate(srv string) (string, error) {
 	S := big.NewInt(0).Exp(t1, t2, pf.N)
 
 	c.xK = c.s.hashbyte(S.Bytes())
-	c.xM = c.s.hashbyte(c.xK, c.xA.Bytes(), B.Bytes(), c.i, salt, pf.N.Bytes(), pf.g.Bytes())
 
+	// M = H(H(N) xor H(g), H(I), s, A, B, K)
+	// M = H(K, A, B, I, s, N, g)
+	hn := c.s.hashbyte(pf.N.Bytes())
+	hg := c.s.hashbyte(pf.g.Bytes())
+	groupXOR := make([]byte, len(hn))
+	if length := safeXORBytes(groupXOR, hn[:], hg[:]); length != len(hn) {
+		return "", fmt.Errorf("XOR had %d bytes instead of %d",
+			length, len(hn))
+	}
+	c.xM = c.s.hashbyte(groupXOR, c.i, salt, c.xA.Bytes(), B.Bytes(), c.xK)
+	// c.xM = c.s.hashbyte(c.xK, c.xA.Bytes(), B.Bytes(), c.i, salt, pf.N.Bytes(), pf.g.Bytes())
 	//fmt.Printf("Client %d:\n\tx=%x\n\tS=%x\n\tK=%x\n\tM=%x\n", c.n *8, x, S, c.xK, c.xM)
 
 	return hex.EncodeToString(c.xM), nil
@@ -420,7 +430,7 @@ func (c *Client) Generate(srv string) (string, error) {
 // ServerOk takes a 'proof' offered by the server and verifies that it is valid.
 // i.e., we should compute the same hash() on M that the server did.
 func (c *Client) ServerOk(proof string) bool {
-	h := c.s.hashbyte(c.xK, c.xM)
+	h := c.s.hashbyte(c.xA.Bytes(), c.xK, c.xM)
 	myh := hex.EncodeToString(h)
 
 	return subtle.ConstantTimeCompare([]byte(myh), []byte(proof)) == 1
@@ -444,6 +454,7 @@ type Server struct {
 	i    []byte
 	salt []byte
 	v    *big.Int
+	xA   *big.Int
 	xB   *big.Int
 	xK   []byte
 	xM   []byte
@@ -459,6 +470,7 @@ func (s *Server) Marshal() string {
 		hex.EncodeToString(s.i),
 		hex.EncodeToString(s.salt),
 		s.v.Text(10),
+		s.xA.Text(10),
 		s.xB.Text(10),
 		hex.EncodeToString(s.xK),
 		hex.EncodeToString(s.xM),
@@ -469,8 +481,8 @@ func (s *Server) Marshal() string {
 // Server struct with the data if possible, otherwise it returns an error.
 func UnmarshalServer(s string) (*Server, error) {
 	p := strings.Split(s, ":")
-	if len(p) != 8 {
-		return nil, fmt.Errorf("unmarshal: malformed fields exp 8, saw %d", len(p))
+	if len(p) != 9 {
+		return nil, fmt.Errorf("unmarshal: malformed fields exp 9, saw %d", len(p))
 	}
 
 	sz, err := strconv.Atoi(p[0])
@@ -507,19 +519,24 @@ func UnmarshalServer(s string) (*Server, error) {
 		return nil, fmt.Errorf("unmarshal: invalid verifier: %s", p[4])
 	}
 
-	B := atobi(p[5], 10)
+	A := atobi(p[5], 10)
 	if r := recover(); r != nil {
-		return nil, fmt.Errorf("unmarshal: invalid ephemeral key B: %s", p[5])
+		return nil, fmt.Errorf("unmarshal: invalid ephemeral key A: %s", p[5])
 	}
 
-	K, err := hex.DecodeString(p[6])
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal: invalid key: %s", p[6])
+	B := atobi(p[6], 10)
+	if r := recover(); r != nil {
+		return nil, fmt.Errorf("unmarshal: invalid ephemeral key B: %s", p[6])
 	}
 
-	M, err := hex.DecodeString(p[7])
+	K, err := hex.DecodeString(p[7])
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal: invalid M: %s", p[7])
+		return nil, fmt.Errorf("unmarshal: invalid key: %s", p[7])
+	}
+
+	M, err := hex.DecodeString(p[8])
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal: invalid M: %s", p[8])
 	}
 
 	return &Server{
@@ -530,6 +547,7 @@ func UnmarshalServer(s string) (*Server, error) {
 		i:    i,
 		salt: salt,
 		v:    v,
+		xA:   A,
 		xB:   B,
 		xK:   K,
 		xM:   M,
@@ -552,6 +570,7 @@ func (s *SRP) NewServer(v *Verifier, A *big.Int) (*Server, error) {
 		salt: v.s,
 		i:    v.i,
 		v:    big.NewInt(0).SetBytes(v.v),
+		xA:   A,
 	}
 
 	// g, N := field(bits)
@@ -578,8 +597,18 @@ func (s *SRP) NewServer(v *Verifier, A *big.Int) (*Server, error) {
 
 	sx.xB = B
 	sx.xK = s.hashbyte(S.Bytes())
-	sx.xM = s.hashbyte(sx.xK, A.Bytes(), B.Bytes(), v.i, v.s, pf.N.Bytes(), pf.g.Bytes())
 
+	// M = H(H(N) xor H(g), H(I), s, A, B, K)
+	// M = H(K, A, B, I, s, N, g)
+	hn := s.hashbyte(pf.N.Bytes())
+	hg := s.hashbyte(pf.g.Bytes())
+	groupXOR := make([]byte, len(hn))
+	if length := safeXORBytes(groupXOR, hn[:], hg[:]); length != len(hn) {
+		return nil, fmt.Errorf("XOR had %d bytes instead of %d",
+			length, len(hn))
+	}
+	sx.xM = s.hashbyte(groupXOR, v.i, v.s, A.Bytes(), B.Bytes(), sx.xK)
+	// sx.xM = s.hashbyte(sx.xK, A.Bytes(), B.Bytes(), v.i, v.s, pf.N.Bytes(), pf.g.Bytes())
 	//fmt.Printf("Server %d:\n\tv=%x\n\tk=%x\n\tA=%x\n\tS=%x\n\tK=%x\n\tM=%x\n", bits, v, k, A.Bytes(), S, s.xK, s.xM)
 
 	return sx, nil
@@ -602,7 +631,10 @@ func (s *Server) ClientOk(m string) (proof string, ok bool) {
 		return "", false
 	}
 
-	h := s.s.hashbyte(s.xK, s.xM)
+	//     M' = H(A, M, K)
+	//     M' = H(M, K)
+
+	h := s.s.hashbyte(s.xA.Bytes(), s.xK, s.xM)
 	return hex.EncodeToString(h), true
 }
 
@@ -634,6 +666,18 @@ func (s *SRP) hashint(a ...[]byte) *big.Int {
 	b := s.hashbyte(a...)
 	i.SetBytes(b)
 	return i
+}
+
+// lifted straight from https://golang.org/src/crypto/cipher/xor.go
+func safeXORBytes(dst, a, b []byte) int {
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
+	}
+	for i := 0; i < n; i++ {
+		dst[i] = a[i] ^ b[i]
+	}
+	return n
 }
 
 func atoi(s string) int {
