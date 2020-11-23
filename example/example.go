@@ -7,7 +7,8 @@ package main
 import (
 	"crypto/subtle"
 	"fmt"
-	"github.com/opencoff/go-srp"
+
+	"github.com/ooozws/go-srp"
 )
 
 func main() {

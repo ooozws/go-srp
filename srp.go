@@ -408,6 +408,7 @@ func (c *Client) Generate(srv string) (string, error) {
 	t1 := big.NewInt(0).Sub(B, t0)
 	t2 := big.NewInt(0).Add(c.a, big.NewInt(0).Mul(u, x))
 	S := big.NewInt(0).Exp(t1, t2, pf.N)
+	fmt.Println("S", S.Text(16))
 
 	c.xK = c.s.hashbyte(S.Bytes())
 
@@ -594,6 +595,7 @@ func (s *SRP) NewServer(v *Verifier, A *big.Int) (*Server, error) {
 
 	t0 = big.NewInt(0).Mul(A, big.NewInt(0).Exp(sx.v, u, pf.N))
 	S := big.NewInt(0).Exp(t0, b, pf.N)
+	fmt.Println("S", S.Text(16))
 
 	sx.xB = B
 	sx.xK = s.hashbyte(S.Bytes())
