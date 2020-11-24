@@ -636,7 +636,7 @@ func (s *Server) ClientOk(m string) (proof string, ok bool) {
 	//     M' = H(A, M, K)
 	//     M' = H(M, K)
 
-	h := s.s.hashbyte(s.xA.Bytes(), s.xK, s.xM)
+	h := s.s.hashbyte(s.xA.Bytes(), s.xM, s.xK)
 	return hex.EncodeToString(h), true
 }
 
