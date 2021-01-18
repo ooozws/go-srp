@@ -208,10 +208,11 @@ type Verifier struct {
 // parameters needed for a future authentication.
 func (s *SRP) Verifier(I, p []byte) (*Verifier, error) {
 	ih := s.hashbyte(I)
-	ph := s.hashbyte(p)
+	// ph := s.hashbyte(p)
 	pf := s.pf
 	salt := randbytes(pf.n)
-	x := s.hashint(ih, ph, salt)
+	// x = H(s | H(I | ":" | P))
+	x := s.hashint(salt, s.hashbyte(I, []byte(":"), p))
 	r := big.NewInt(0).Exp(pf.g, x, pf.N)
 
 	v := &Verifier{
@@ -332,7 +333,9 @@ func (v *Verifier) Encode() (string, string) {
 type Client struct {
 	s  *SRP
 	i  []byte
+	I  []byte
 	p  []byte
+	P  []byte
 	a  *big.Int
 	xA *big.Int
 	k  *big.Int
@@ -347,7 +350,9 @@ func (s *SRP) NewClient(I, p []byte) (*Client, error) {
 	c := &Client{
 		s: s,
 		i: s.hashbyte(I),
+		I: I,
 		p: s.hashbyte(p),
+		P: p,
 		a: randBigInt(pf.n * 8),
 		k: s.hashint(pf.N.Bytes(), pad(pf.g, pf.n)),
 	}
@@ -401,14 +406,14 @@ func (c *Client) Generate(srv string) (string, error) {
 
 	// S := ((B - kg^x) ^ (a + ux)) % N
 
-	x := c.s.hashint(c.i, c.p, salt)
+	// x = H(s | H(I | ":" | P))
+	x := c.s.hashint(salt, c.s.hashbyte(c.I, []byte(":"), c.P))
 	t0 := big.NewInt(0).Exp(pf.g, x, pf.N)
 	t0 = t0.Mul(t0, c.k)
 
 	t1 := big.NewInt(0).Sub(B, t0)
 	t2 := big.NewInt(0).Add(c.a, big.NewInt(0).Mul(u, x))
 	S := big.NewInt(0).Exp(t1, t2, pf.N)
-	fmt.Println("S", S.Text(16))
 
 	c.xK = c.s.hashbyte(S.Bytes())
 
@@ -595,7 +600,6 @@ func (s *SRP) NewServer(v *Verifier, A *big.Int) (*Server, error) {
 
 	t0 = big.NewInt(0).Mul(A, big.NewInt(0).Exp(sx.v, u, pf.N))
 	S := big.NewInt(0).Exp(t0, b, pf.N)
-	fmt.Println("S", S.Text(16))
 
 	sx.xB = B
 	sx.xK = s.hashbyte(S.Bytes())

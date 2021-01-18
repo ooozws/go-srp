@@ -7,6 +7,7 @@ package main
 import (
 	"crypto/subtle"
 	"fmt"
+	"time"
 
 	"github.com/ooozws/go-srp"
 )
@@ -21,10 +22,14 @@ func main() {
 		panic(err)
 	}
 
+	start := time.Now()
 	v, err := s.Verifier(i, pass)
 	if err != nil {
 		panic(err)
 	}
+
+	end := time.Now()
+	fmt.Println("duration", end.Sub(start))
 
 	ih, vh := v.Encode()
 
